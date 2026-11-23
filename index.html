@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Baltimore Parcel Vacancy Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-height map with a records panel on the left (stacks under the map on phones). */
+:root {
+  --bg: #f6f7f5; --panel: #ffffff; --fg: #1d2326; --muted: #5d676c; --line: #dfe3e1; --ground: #eef0ec;
+  --accent: #2a78d6; --conflict: #8e44ad;
+  --c0: #c0392b; --c1: #eb6834; --c2: #b8a51f; --c3: #2e8b57; --c4: #0f5c3a; --c5: #2a78d6; --c6: #9aa3a8;
+  --base-opacity: .5; --land: #fbfbf8; --water: #dce6ea; --border: #b9c0bd; --city: #1d2326;
+  --s1: #f3c9a8; --s2: #e58f5c; --s3: #c2512a; --s4: #6e1e12;
+  --sans: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121618; --panel: #191e21; --fg: #e6eaeb; --muted: #9aa5aa; --line: #2c3438; --ground: #0e1214;
+  --accent: #6aa8f0; --conflict: #c58ae0; --c4: #3f9e6f; --c6: #6b7479; --base-opacity: .42;
+  --land: #1c2225; --water: #0d1416; --border: #3a4448; --city: #e6eaeb;
+  --s1: #5a3424; --s2: #a4512c; --s3: #e0743c; --s4: #ffc59a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #121618; --panel: #191e21; --fg: #e6eaeb; --muted: #9aa5aa; --line: #2c3438; --ground: #0e1214;
+  --accent: #6aa8f0; --conflict: #c58ae0; --c4: #3f9e6f; --c6: #6b7479; --base-opacity: .42;
+  --land: #1c2225; --water: #0d1416; --border: #3a4448; --city: #e6eaeb;
+  --s1: #5a3424; --s2: #a4512c; --s3: #e0743c; --s4: #ffc59a; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; }
+.app { height: 100%; display: grid; grid-template-columns: minmax(320px, 400px) 1fr; }
+.panel { background: var(--panel); border-right: 1px solid var(--line); overflow-y: auto; min-width: 0;
+  padding-block: 18px 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: 16px; display: flex; flex-direction: column; gap: 18px; }
+#map { background: var(--water); min-height: 0; }
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.modes button { font: inherit; font-size: 13px; font-weight: 600; padding: 9px 6px; border: 0; background: var(--bg); color: var(--fg); cursor: pointer; }
+.modes button[aria-pressed="true"] { background: var(--fg); color: var(--panel); }
+.back { font: inherit; font-weight: 600; font-size: 13px; align-self: flex-start; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.back:hover { border-color: var(--fg); }
+.signals { margin: 0; padding-left: 18px; line-height: 1.5; }
+.signals li.no { color: var(--muted); text-decoration: line-through; }
+.envsec { display: flex; flex-direction: column; gap: 8px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1.5px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
+.metrics { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; font-size: 13px; }
+.metrics dt { color: var(--muted); } .metrics dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.home { font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+h1 { font-size: 19px; line-height: 1.25; margin: 0; text-wrap: balance; font-weight: 700; }
+.sub { color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
+h2 { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.mono { font-family: var(--mono); }
+.search { position: relative; }
+.search input { width: 100%; box-sizing: border-box; font: inherit; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.search input:focus-visible, button:focus-visible, a:focus-visible, label:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.results { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); position: absolute; inset-inline: 0; z-index: 1200; }
+.results li button { all: unset; box-sizing: border-box; width: 100%; display: flex; gap: 10px; padding: 7px 10px; cursor: pointer; }
+.results li button:hover, .results li button:focus-visible { background: var(--bg); }
+.legend { display: grid; gap: 2px; }
+.lrow { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 5px; cursor: pointer; }
+.lrow:hover { background: var(--bg); }
+.lrow input { position: absolute; opacity: 0; pointer-events: none; }
+.sw { width: 14px; height: 14px; border-radius: 3px; border: 2px solid transparent; box-sizing: border-box; }
+.lrow.off .sw { background: transparent !important; border-color: var(--line); }
+.lrow.off span:not(.sw) { color: var(--muted); }
+.n { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12.5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 12.5px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.addr { font-weight: 600; font-size: 15.5px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+.cert { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line); color: var(--muted); }
+.why { color: var(--muted); line-height: 1.45; margin: 0; }
+.warn { border-left: 3px solid var(--conflict); padding: 6px 10px; background: var(--bg); line-height: 1.45; }
+.links { display: flex; gap: 14px; flex-wrap: wrap; }
+a { color: var(--accent); }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; padding: 4px 6px 6px 0; border-bottom: 1px solid var(--line); }
+td { padding: 6px 6px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.35; }
+td.v { word-break: break-word; }
+.small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+details summary { cursor: pointer; font-weight: 600; }
+.foot { margin-top: auto; }
+.empty { color: var(--muted); line-height: 1.5; margin: 0; }
+/* Leaflet essentials (library CSS cannot load from a CDN here) */
+.leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-pane > svg, .leaflet-pane > canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
+.leaflet-container { overflow: hidden; -webkit-tap-highlight-color: transparent; font-family: var(--sans); outline-offset: 1px; }
+.leaflet-container img.leaflet-image-layer { max-width: none !important; max-height: none !important; }
+.leaflet-container.leaflet-touch-zoom { touch-action: pan-x pan-y; }
+.leaflet-container.leaflet-touch-drag { touch-action: none; }
+.leaflet-container.leaflet-touch-drag.leaflet-touch-zoom { touch-action: none; }
+.leaflet-pane { z-index: 400; } .leaflet-tile-pane { z-index: 200; } .leaflet-overlay-pane { z-index: 400; } .leaflet-marker-pane { z-index: 600; } .leaflet-popup-pane { z-index: 700; }
+.leaflet-map-pane canvas { z-index: 100; } .leaflet-map-pane svg { z-index: 200; }
+.leaflet-image-layer { opacity: var(--base-opacity); }
+.leaflet-zoom-animated { transform-origin: 0 0; }
+.leaflet-zoom-anim .leaflet-zoom-animated { transition: transform .25s cubic-bezier(0,0,.25,1); }
+.leaflet-zoom-anim .leaflet-zoom-hide { visibility: hidden; }
+.leaflet-popup { position: absolute; text-align: center; margin-bottom: 20px; }
+.leaflet-popup-content-wrapper { background: var(--panel); color: var(--fg); border-radius: 8px; padding: 1px; text-align: left; box-shadow: 0 3px 14px rgba(0,0,0,.25); }
+.leaflet-popup-content { margin: 10px 26px 10px 14px; line-height: 1.4; font-size: 13px; }
+.leaflet-popup-tip-container { width: 40px; height: 20px; position: absolute; left: 50%; margin-top: -1px; margin-left: -20px; overflow: hidden; pointer-events: none; }
+.leaflet-popup-tip { width: 17px; height: 17px; padding: 1px; margin: -10px auto 0; transform: rotate(45deg); background: var(--panel); }
+.leaflet-popup-close-button { position: absolute; top: 2px; right: 4px; width: 22px; height: 22px; font: 18px/22px var(--sans); color: var(--muted); text-decoration: none; text-align: center; }
+.leaflet-interactive { cursor: pointer; } .leaflet-grab { cursor: grab; } .leaflet-dragging .leaflet-grab { cursor: move; }
+.leaflet-control { position: relative; z-index: 800; pointer-events: auto; float: left; clear: both; }
+.leaflet-top, .leaflet-bottom { position: absolute; z-index: 1000; pointer-events: none; }
+.leaflet-top { top: 0; } .leaflet-right { right: 0; } .leaflet-bottom { bottom: 0; } .leaflet-left { left: 0; }
+.leaflet-right .leaflet-control { float: right; margin-right: max(10px, env(safe-area-inset-right, 0px)); }
+.leaflet-top .leaflet-control { margin-top: 10px; }
+.leaflet-bar { border-radius: 6px; border: 1px solid var(--line); overflow: hidden; }
+.leaflet-bar a { display: block; width: 32px; height: 32px; line-height: 32px; text-align: center; text-decoration: none; background: var(--panel); color: var(--fg); font-size: 18px; }
+.leaflet-bar a + a { border-top: 1px solid var(--line); }
+.leaflet-bar a.leaflet-disabled { color: var(--muted); cursor: default; }
+.status { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 1000; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: 12.5px; }
+.mapwrap { position: relative; min-height: 0; }
+.mapwrap #map { position: absolute; inset: 0; }
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 58vh auto; height: auto; }
+  .panel { border-right: 0; border-top: 1px solid var(--line); overflow: visible; padding-right: max(16px, env(safe-area-inset-right, 0px)); order: 2; }
+  .mapwrap { order: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .leaflet-zoom-anim .leaflet-zoom-animated { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="panel">
+    <header>
+      <h1>Baltimore parcel vacancy map</h1>
+      <p class="sub">Every city parcel, labelled from public records, with a certainty and the receipts behind each label. Built <span id="built">2026-11-23</span>.</p>
+    </header>
+    <div class="modes" role="group" aria-label="Map layer">
+      <button type="button" data-mode="all" aria-pressed="true">All land</button>
+      <button type="button" data-mode="B" aria-pressed="false">Vacant buildings</button>
+      <button type="button" data-mode="L" aria-pressed="false">Vacant lots</button>
+      <button type="button" data-mode="canopy" aria-pressed="false">Tree canopy</button>
+      <button type="button" data-mode="storm" aria-pressed="false">Stormwater</button>
+    </div>
+    <div class="search">
+      <label for="q" class="small">Find a parcel by address or block-lot</label>
+      <input id="q" type="search" placeholder="2113 Wilkens Ave or 0702 050" autocomplete="off">
+      <ul class="results" id="results" hidden></ul>
+    </div>
+    <section id="detail" aria-live="polite"><p class="empty">Click a coloured parcel, or search for any address, to see its label and the records behind it. Grey parcels have no vacancy evidence.</p></section>
+    <section>
+      <h2 id="legendh">Categories</h2>
+      <div class="legend" id="legend"></div>
+      <p class="small" id="legendnote" hidden></p>
+    </section>
+    <section id="envsec" class="envsec" hidden>
+      <div class="chips" id="canopyview"><button type="button" class="chip" data-v="canopy" aria-pressed="true">Canopy 2021</button><button type="button" class="chip" data-v="canopy_change" aria-pressed="false">Change since 2013</button></div>
+      <div class="chips" id="stormtoggles">
+        <button type="button" class="chip" data-t="imperv" aria-pressed="true">Paved and roofed share</button>
+        <button type="button" class="chip" data-t="pipes" aria-pressed="true">Storm pipes</button>
+        <button type="button" class="chip" data-t="inlets" aria-pressed="true">Inlets</button>
+        <button type="button" class="chip" data-t="outfalls" aria-pressed="false">Outfalls</button>
+        <button type="button" class="chip" data-t="projects" aria-pressed="true">Restoration projects</button>
+      </div>
+      <p class="small" id="envnote"></p>
+    </section>
+    <section id="certsec">
+      <h2>Certainty</h2>
+      <div class="chips" id="certs"></div>
+    </section>
+    <section id="confsec">
+      <h2>Disagreements</h2>
+      <div class="chips"><button class="chip" id="conf" aria-pressed="false" type="button">Only parcels where sources disagree</button></div>
+      <p class="small" id="confn"></p>
+    </section>
+    <details>
+      <summary>How labels are assigned</summary>
+      <div class="tbl"><table id="rules"><thead><tr><th>Rule</th><th>Label</th><th>Condition</th></tr></thead><tbody></tbody></table></div>
+      <p class="small">Rules apply in order; the first that matches sets the label. Park and protected land outrank vacancy, and vacant buildings outrank transportation ownership.</p>
+    </details>
+    <details>
+      <summary>Sources</summary>
+      <div class="tbl"><table id="sources"><thead><tr><th>Source</th><th>Records</th><th>Layer edited</th></tr></thead><tbody></tbody></table></div>
+    </details>
+    <p class="small foot">Records come from the City of Baltimore (Open Baltimore, DHCD), Baltimore Green Space, UMBC and BNIA. This index is not an official determination of vacancy.</p>
+  </aside>
+  <div class="mapwrap"><div id="map" role="region" aria-label="Map of Baltimore parcels"></div><div class="status" id="status">Loading parcels…</div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const CATS = ["VACANT_BUILDING","VACANT_LOT","COMMUNITY_OPEN_SPACE","PARK","PROTECTED_GREENSPACE","TRANSPORTATION","NOT_VACANT"];
+const LAB = ["Vacant building","Vacant lot","Community-managed open space","Rec & Parks land","Baltimore Green Space protected","Transportation land","No vacancy evidence"];
+const CERT = ["high","medium","low"], CERT_OP = [0.9, 0.6, 0.32];
+const FIELD_LAB = {owner:"Owner and agency", NO_IMPRV:"Improvements", VACIND:"Assessor vacancy flag", vacant_building_notice:"Vacant building notice",
+  vacant_lot_list:"City vacant-lot list", vacant_lot_list_city:"City-owned vacant lots", vacant_lot_list_private:"Private vacant lots",
+  rec_parks_inventory:"Rec & Parks inventory", demolition:"Demolition", rehab_permit:"Rehab permit", receivership_open:"Receivership (open)",
+  receivership_settled:"Receivership (settled)", adopt_a_lot:"Adopt-a-Lot", vacants_to_value:"Vacants to Value", foreclosure_filing:"Foreclosure filing",
+  tax_sale_2023:"2023 tax sale", bgs_community_site_2023:"BGS community site (2023)", bgs_preserved_site:"BGS preserved site",
+  bgs_forest_site:"BGS forest site", bgs_forest_site_point:"BGS forest site", urban_ag_site:"Urban agriculture site"};
+const MET_LAB = {key_exact:"key, exact", key_normalized:"key, normalized", self:"parcel record", spatial_best:"by location", spatial_cover:"by location", spatial_point:"by location"};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const colors = () => CATS.map((_, i) => css("--c" + i));
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const KEY_RE = /^(\d{4}[A-Z]?|PSC\d)(\d{3}[A-Z]?)$/;
+const normKey = s => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const fmtKey = k => { const m = KEY_RE.exec(k); return m ? m[1] + " " + m[2] : k; };
+
+let meta, srcById = {}, map, renderer, groups = {}, byKey = {}, selected = null, marker = null, searchIdx = null, chunks = {};
+const state = { cats: new Set([0,1,2,3,4,5]), certs: new Set([0,1,2]), conflictOnly: false, mode: "all", bins: new Set([1,2,3,4]) };
+let envMeta = null, envOverlays = {}, swLayers = {}, envChunks = {}, canopyView = "canopy";
+const stormOn = new Set(["imperv", "pipes", "inlets", "projects"]);
+const ENV_MODES = ["canopy", "storm"];
+const PROJ_COL = { Completed: "#1f7a4d", Planned: "#2a78d6", Potential: "#d09a1a" };
+const projColor = st => PROJ_COL[st] || "#8a8f93";
+const evGroups = { B: {}, L: {} }, evCounts = { B: {}, L: {} }, maskByKey = {};
+let ctx = null, ctxLayers = [], cityBounds = null, DEFAULT_DETAIL = "";
+function drawContextStyle() {
+  ctxLayers.forEach(([l, kind]) => l.setStyle(kind === "state" ? { fillColor: css("--land"), fillOpacity: 1, color: css("--border"), weight: 1.2 }
+    : kind === "county" ? { fill: false, color: css("--border"), weight: 0.8, dashArray: "3 3" }
+    : { fill: false, color: css("--city"), weight: 2 }));
+}
+function resetView() {
+  selected = null; if (marker) { map.removeLayer(marker); marker = null; }
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  $("detail").innerHTML = DEFAULT_DETAIL; $("results").hidden = true;
+  map.flyToBounds(cityBounds, { duration: 0.6 });
+}
+
+async function getJSON(u) { const r = await fetch(u); if (!r.ok) throw new Error(u + " " + r.status); return r.json(); }
+
+function styleFor(c, r, x) {
+  const col = colors();
+  return { renderer, stroke: x && state.conflictOnly, color: css("--conflict"), weight: 1.2, fillColor: col[c], fillOpacity: c === 6 ? 0.25 : CERT_OP[r] };
+}
+function gkey(c, r, x) { return c + "-" + r + "-" + x; }
+function applyFilters() {
+  for (const [k, g] of Object.entries(groups)) {
+    const [c, r, x] = k.split("-").map(Number);
+    const show = state.mode === "all" && (c === 6 ? state.conflictOnly : state.cats.has(c)) && state.certs.has(r) && (!state.conflictOnly || x === 1);
+    toggle(g, show);
+  }
+  for (const m of ["B", "L"]) for (const [s, g] of Object.entries(evGroups[m])) toggle(g, state.mode === m && state.bins.has(+s));
+  $("certsec").hidden = $("confsec").hidden = state.mode !== "all";
+  $("envsec").hidden = !ENV_MODES.includes(state.mode);
+  $("canopyview").hidden = state.mode !== "canopy"; $("stormtoggles").hidden = state.mode !== "storm";
+  if (envMeta) {
+    const want = new Set();
+    if (state.mode === "canopy") want.add(canopyView);
+    if (state.mode === "storm") { if (stormOn.has("imperv")) want.add("imperv"); if (stormOn.has("pipes")) want.add("pipes"); }
+    for (const name of ["canopy", "canopy_change", "imperv", "pipes"]) {
+      if (want.has(name) && !envOverlays[name]) envOverlays[name] = L.layerGroup(meta.tiles.map(t =>
+        L.imageOverlay(t.f.replace("base_", name === "pipes" ? "pipes_" : "env_" + name + "_"), t.b, { interactive: false, className: "envimg" })));
+      if (envOverlays[name]) toggle(envOverlays[name], want.has(name));
+    }
+    for (const name of ["inlets", "outfalls", "projects"]) if (swLayers[name]) toggle(swLayers[name], state.mode === "storm" && stormOn.has(name) && (name !== "inlets" || map.getZoom() >= 16));
+  }
+  renderLegend();
+}
+function toggle(g, show) { if (show && !map.hasLayer(g)) g.addTo(map); else if (!show && map.hasLayer(g)) map.removeLayer(g); }
+function evStyle(s) { return { renderer, stroke: false, fillColor: css("--s" + s), fillOpacity: 0.92 }; }
+function restyle() {
+  for (const [k, g] of Object.entries(groups)) { const [c, r, x] = k.split("-").map(Number); g.setStyle(styleFor(c, r, x)); }
+  for (const m of ["B", "L"]) for (const [s, g] of Object.entries(evGroups[m])) g.setStyle(evStyle(+s));
+  drawContextStyle();
+}
+// Bureaucratic vacancy signals, one bit each (order set in scripts/41_export_web_extras.R)
+const SIGNALS = ["Open vacant building notice (DHCD)", "Assessor vacancy flag (VACIND=Y)", "Open receivership case", "Vacants to Value listing",
+  "2023 tax sale list", "Assessor: no improvements (NO_IMPRV=Y)", "City vacant-lot list", "Oct 2025 city or private vacant-lot list",
+  "Completed demolition", "Adopt-a-Lot record"];
+const MODE_BITS = { B: [0, 1, 2, 3, 4], L: [5, 6, 7, 8, 9] };
+const score = (m, mode) => MODE_BITS[mode].reduce((a, b) => a + ((m >> b) & 1), 0);
+const BIN_LAB = ["", "1 record", "2 records", "3 records", "4 or more records"];
+
+function renderLegend() {
+  if (ENV_MODES.includes(state.mode)) return renderEnvLegend();
+  if (state.mode !== "all") return renderEvLegend();
+  $("legendh").textContent = "Categories"; $("legendnote").hidden = true;
+  const counts = Array(7).fill(0); meta.counts.forEach(d => { const i = CATS.indexOf(d.category); if (state.certs.has(CERT.indexOf(d.certainty))) counts[i] += d.N; });
+  const col = colors();
+  $("legend").innerHTML = CATS.map((c, i) => {
+    const on = i === 6 || state.cats.has(i);
+    return `<label class="lrow${on ? "" : " off"}"><input type="checkbox" data-c="${i}" ${on ? "checked" : ""} ${i === 6 ? "disabled" : ""}>
+      <span class="sw" style="background:${col[i]}"></span><span>${LAB[i]}</span><span class="n">${counts[i].toLocaleString()}</span></label>`;
+  }).join("");
+  $("legend").querySelectorAll("input").forEach(el => el.addEventListener("change", () => {
+    const i = +el.dataset.c; el.checked ? state.cats.add(i) : state.cats.delete(i); applyFilters(); }));
+}
+function renderEvLegend() {
+  const m = state.mode, n = evCounts[m];
+  $("legendh").textContent = (m === "B" ? "Vacant buildings" : "Vacant lots") + ": records showing vacancy";
+  $("legend").innerHTML = [1, 2, 3, 4].map(s => `<label class="lrow${state.bins.has(s) ? "" : " off"}"><input type="checkbox" data-s="${s}" ${state.bins.has(s) ? "checked" : ""}>
+    <span class="sw" style="background:${css("--s" + s)}"></span><span>${BIN_LAB[s]}</span><span class="n">${(n[s] || 0).toLocaleString()}</span></label>`).join("");
+  $("legend").querySelectorAll("input").forEach(el => el.addEventListener("change", () => {
+    const s = +el.dataset.s; el.checked ? state.bins.add(s) : state.bins.delete(s); applyFilters(); }));
+  $("legendnote").hidden = false;
+  $("legendnote").innerHTML = `Darker means more separate government records point to vacancy. Records counted: ${MODE_BITS[m].map(b => esc(SIGNALS[b])).join("; ")}.`;
+}
+function renderEnvLegend() {
+  $("legendnote").hidden = false;
+  if (!envMeta) { $("legendh").textContent = "Loading"; $("legend").innerHTML = ""; $("legendnote").textContent = "Loading canopy and stormwater data…"; return; }
+  const name = state.mode === "canopy" ? canopyView : "imperv", L0 = envMeta.layers[name], n = envMeta.counts[name];
+  $("legendh").textContent = { canopy: "Tree canopy, share of parcel (2021/22)", canopy_change: "Canopy change, 2013/14 to 2021/22 (percentage points)", imperv: "Paved and roofed share of parcel (2021/22)" }[name];
+  let rows = L0.lab.map((lab, i) => `<div class="lrow"><span class="sw" style="background:${L0.col[i]}"></span><span>${esc(lab)}</span><span class="n">${(n[i] || 0).toLocaleString()}</span></div>`).join("");
+  if (state.mode === "storm") rows += `<div class="lrow"><span class="sw" style="background:#2f7fbf;height:3px"></span><span>Storm pipe (active)</span><span></span></div>
+    <div class="lrow"><span class="dot" style="background:#5b6770"></span><span>Inlet (zoom in to see)</span><span></span></div>
+    <div class="lrow"><span class="dot" style="background:#7a4fb0"></span><span>Outfall</span><span></span></div>` +
+    Object.entries(PROJ_COL).concat([["Rejected or infeasible", "#8a8f93"]]).map(([k, c]) => `<div class="lrow"><span class="dot" style="background:${c}"></span><span>Restoration project: ${k.toLowerCase()}</span><span class="n">${(k === "Rejected or infeasible" ? Object.entries(envMeta.status_counts).filter(([s]) => !PROJ_COL[s]).reduce((a, [, v]) => a + v, 0) : envMeta.status_counts[k] || 0).toLocaleString()}</span></div>`).join("");
+  $("legend").innerHTML = rows;
+  $("legendnote").textContent = state.mode === "canopy"
+    ? "Measured from 1-metre land-cover maps made from aerial imagery (Chesapeake Bay Program land use/land cover, 2024 edition). Counts are parcel footprints."
+    : "Paved and roofed share comes from the same 1-metre land cover. Pipes, inlets and outfalls are the city's storm drain records (DPW). Projects are DPW's stormwater restoration planning sites.";
+}
+async function ensureEnv() {
+  if (envMeta) return;
+  envMeta = await getJSON("env_meta.json");
+  const sw = await getJSON("stormwater.json");
+  swLayers.projects = L.layerGroup(sw.projects.map(([ll, type, st, plan, id]) => L.circleMarker(ll, { renderer, bubblingMouseEvents: false, radius: 5.5, weight: 1.5, color: css("--panel"), fillColor: projColor(st), fillOpacity: 1 })
+    .bindPopup(`<strong>${esc(type)}</strong><br>${esc(st)}${plan ? "<br>Plan " + esc(plan) : ""}<br><a href="${esc(envMeta.urls.SW_PROJECTS)}/query?where=${encodeURIComponent(envMeta.oid.SW_PROJECTS + "=" + id)}&outFields=*&f=html" target="_blank" rel="noopener">DPW record</a>`)));
+  swLayers.outfalls = L.layerGroup(sw.outfalls.map(([ll, oid, type, ws]) => L.circleMarker(ll, { renderer, bubblingMouseEvents: false, radius: 4, weight: 1, color: css("--panel"), fillColor: "#7a4fb0", fillOpacity: 1 })
+    .bindPopup(`<strong>Outfall ${esc(oid)}</strong><br>${esc(type)}; ${esc(ws)}`)));
+  swLayers.inlets = L.layerGroup(sw.inlets.map(([la, lo, ag]) => L.circleMarker([la, lo], { renderer, radius: 2.5, weight: 0, fillColor: ag === 2 ? "#b8730f" : "#5b6770", fillOpacity: 0.9, interactive: false })));
+  map.on("zoomend", () => { if (state.mode === "storm") applyFilters(); });
+  const extra = envMeta.sources.filter(s => !s.source_id.startsWith("PARCEL"));
+  $("sources").querySelector("tbody").insertAdjacentHTML("beforeend", extra.map(s => `<tr><td><a href="${esc(s.portal_url || s.service_url)}" target="_blank" rel="noopener">${esc(s.name || s.source_id)}</a><br><span class="small">${esc(s.role || "")}</span></td><td class="n">${s.n_records ? (+s.n_records).toLocaleString() : "raster"}</td><td class="small">downloaded ${esc((s.downloaded_at || "").slice(0, 10))}</td></tr>`).join(""));
+}
+function setMode(m) {
+  if (ENV_MODES.includes(m) && !envMeta) ensureEnv().then(() => { if (state.mode === m) applyFilters(); }).catch(() => { $("legendnote").textContent = "The canopy and stormwater data did not load. Reload the page to try again."; });
+  state.mode = m; document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m)); applyFilters();
+}
+function renderChips() {
+  document.querySelectorAll(".modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
+  $("canopyview").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    canopyView = b.dataset.v; $("canopyview").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); applyFilters(); }));
+  $("stormtoggles").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    const t = b.dataset.t; stormOn.has(t) ? stormOn.delete(t) : stormOn.add(t); b.setAttribute("aria-pressed", stormOn.has(t)); applyFilters(); }));
+  $("certs").innerHTML = CERT.map((c, i) => `<button type="button" class="chip" data-r="${i}" aria-pressed="${state.certs.has(i)}">${c[0].toUpperCase() + c.slice(1)}</button>`).join("");
+  $("certs").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    const i = +b.dataset.r; state.certs.has(i) ? state.certs.delete(i) : state.certs.add(i); b.setAttribute("aria-pressed", state.certs.has(i)); applyFilters(); }));
+  $("conf").addEventListener("click", () => { state.conflictOnly = !state.conflictOnly; $("conf").setAttribute("aria-pressed", state.conflictOnly); restyle(); applyFilters(); });
+}
+
+function recordUrl(sid, id) { const s = srcById[sid]; return s ? `${s.service_url}/query?where=${encodeURIComponent(s.oid + "=" + id)}&outFields=*&f=html` : null; }
+function plainRule(id) { const r = meta.rules.find(r => r.rule_id === id); return r ? r.condition : ""; }
+
+async function select(k, latlng) {
+  selected = k; try { history.replaceState(null, "", "#p-" + k); } catch (e) {}
+  if (marker) { map.removeLayer(marker); marker = null; }
+  const poly = byKey[k];
+  if (poly) { marker = L.polygon(poly.getLatLngs(), { renderer, fill: false, color: css("--fg"), weight: 2.5, interactive: false }).addTo(map); }
+  else if (latlng) { marker = L.circleMarker(latlng, { renderer, radius: 7, color: css("--fg"), weight: 2.5, fill: false, interactive: false }).addTo(map); }
+  $("detail").innerHTML = `<div class="card"><p class="empty">Loading records for <span class="mono">${esc(fmtKey(k))}</span>…</p></div>`;
+  const ch = k.slice(0, 2);
+  try { chunks[ch] = chunks[ch] || await getJSON(`detail/${ch}.json`); } catch (e) { $("detail").innerHTML = `<div class="card"><p class="empty">The records for this parcel did not load. Check your connection and click the parcel again.</p></div>`; return; }
+  if (selected !== k) return;
+  const d = chunks[ch][k]; if (!d) { $("detail").innerHTML = `<div class="card"><p class="empty">No record found for ${esc(k)}.</p></div>`; return; }
+  const m = KEY_RE.exec(k), blk = m ? m[1] : "", lot = m ? m[2] : "";
+  const [ward, sec] = (d.ws || "/").split("/");
+  const sdat = d.ws ? `https://sdat.dat.maryland.gov/RealProperty/Pages/viewdetails.aspx?County=03&SearchType=ACCT&Ward=${ward}&SECTION=${sec}&BLOCK=${blk}&LOT=${lot}` : null;
+  const col = colors()[d.c];
+  const rows = (d.e || []).map(([s, id, f, v, dt, me, ov]) => {
+    const sid = meta.srcs[s], url = recordUrl(sid, id), fl = meta.fields[f], mt = meta.methods[me];
+    return `<tr><td><span class="mono">${esc(sid)}</span><br>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">record ${esc(id)}</a>` : esc(id)}</td>
+      <td>${esc(FIELD_LAB[fl] || fl)}</td><td class="v">${esc(v)}</td><td>${esc(dt)}</td><td>${esc(MET_LAB[mt] || mt)}${ov != null ? `<br>${ov}% of record` : ""}</td></tr>`;
+  }).join("");
+  const mask = maskByKey[k] || 0, mode = d.c === 0 ? "B" : d.c === 1 ? "L" : null;
+  const sigs = mode ? `<div><h2>Records showing vacancy: ${score(mask, mode)} of ${MODE_BITS[mode].length}</h2><ul class="signals">${MODE_BITS[mode].map(b =>
+    `<li class="${(mask >> b) & 1 ? "" : "no"}">${esc(SIGNALS[b])}</li>`).join("")}</ul></div>` : "";
+  $("detail").innerHTML = `<div class="card">
+    <button type="button" class="back" id="back">← Back to city overview</button>
+    <div class="top"><span class="addr">${esc(d.a || "No street address")}</span><span class="mono small">${esc(fmtKey(k))}</span></div>
+    <div class="top"><span class="badge"><span class="sw" style="background:${col}"></span>${LAB[d.c]}</span><span class="cert">${CERT[d.r]} certainty</span></div>
+    <p class="why"><span class="mono">${esc(d.u)}</span>: ${esc(plainRule(d.u))}</p>
+    ${d.n ? `<div class="warn"><strong>Sources disagree:</strong> ${esc(d.n)}</div>` : ""}
+    ${d.cd ? `<p class="small">Condominium unit. Its outline is the whole building, shared with the other units.</p>` : ""}
+    <p class="small">Owner type: ${esc(d.oc.replace(/_/g, " ").toLowerCase())}</p>
+    ${sigs}
+    <div id="envcard"></div>
+    <div class="links">${sdat ? `<a href="${esc(sdat)}" target="_blank" rel="noopener">SDAT assessment</a>` : ""}
+      ${blk ? `<a href="https://gis.baltimorecity.gov/zoning/blockplats/${esc(blk)}.pdf" target="_blank" rel="noopener">Block plat</a>` : ""}</div>
+    <div><h2>Receipts</h2><div class="tbl"><table><thead><tr><th>Source</th><th>Field</th><th>Value</th><th>Date</th><th>Matched</th></tr></thead><tbody>${rows}</tbody></table></div></div>
+  </div>`;
+  fillEnv(k);
+}
+async function fillEnv(k) {
+  const box = () => $("envcard"); if (!box()) return;
+  try { await ensureEnv(); const ch = k.slice(0, 2); envChunks[ch] = envChunks[ch] || await getJSON(`env/${ch}.json`); } catch (e) { box().innerHTML = `<p class="small">Canopy and stormwater figures did not load.</p>`; return; }
+  if (selected !== k || !box()) return;
+  const raw = envChunks[k.slice(0, 2)][k];
+  const v = raw ? Object.fromEntries(envMeta.cols.map((c, i) => [c, raw[i]])) : null;
+  if (raw && raw[envMeta.cols.length]) { const c = raw[envMeta.cols.length]; v.e = c[0].map((_, i) => c.map(col => col[i])); }
+  if (!v) { box().innerHTML = `<p class="small">No canopy or stormwater figures for this parcel.</p>`; return; }
+  const f = (x, u = "%") => x == null ? "n/a" : (+x).toLocaleString() + u;
+  const sgn = x => x == null ? "n/a" : (x > 0 ? "+" : "") + x + " pts";
+  const rows = [
+    ["Tree canopy, 2021/22", f(v.canopy_pct_2021)], ["Tree canopy, 2013/14", f(v.canopy_pct_2013)], ["Canopy change", sgn(v.canopy_change_pp_2013_2021)],
+    ["Paved and roofed, 2021/22", f(v.imperv_pct_2021)], ["  of which buildings", f(v.structures_pct_2021)],
+    ["Paved and roofed area", f(v.imperv_sqft_2021, " sq ft")], ["Stormwater fee units (estimate)", f(v.eru_est_2021, " ERU")],
+    ["Nearest storm inlet", f(v.inlet_dist_m, " m")], ["Inlets on parcel", `${v.inlets_on_parcel ?? 0}${v.private_inlets_on_parcel ? ` (${v.private_inlets_on_parcel} private)` : ""}`],
+    ["Storm pipe crossing parcel", v.pipe_m_on_parcel ? f(v.pipe_m_on_parcel, " m") : "none"],
+    ["Restoration projects within 30 m", v.sw_projects_within_30m ? `${v.sw_projects_within_30m}` : "none"],
+    ["Public trees on parcel", `${v.public_trees_on_parcel ?? 0}`]];
+  const ev = (v.e || []).map(([sid, id, fl, val, dt]) => {
+    const url = envMeta.urls[sid] ? `${envMeta.urls[sid]}/query?where=${encodeURIComponent(envMeta.oid[sid] + "=" + id)}&outFields=*&f=html` : null;
+    return `<tr><td><span class="mono">${esc(sid)}</span><br>${url ? `<a href="${esc(url)}" target="_blank" rel="noopener">record ${esc(id)}</a>` : esc(id)}</td><td>${esc(fl.replace(/_/g, " "))}</td><td class="v">${esc(val)}</td><td>${esc(dt || "")}</td></tr>`; }).join("");
+  box().innerHTML = `<h2>Canopy and stormwater</h2><dl class="metrics">${rows.map(([a, b]) => `<dt>${esc(a.trim())}</dt><dd>${esc(b)}</dd>`).join("")}</dl>
+    ${v.sw_project_detail ? `<p class="small">Nearby projects: ${esc(v.sw_project_detail)}</p>` : ""}
+    <p class="small">Land-cover certainty: ${esc(v.lc_certainty)}. Shares come from 1-metre land cover (Chesapeake Bay Program, 2024 edition). Fee units use 1 ERU = 1,050 sq ft of impervious area and are an estimate, not a DPW bill.</p>
+    ${ev ? `<div class="tbl"><table><thead><tr><th>Source</th><th>Field</th><th>Value</th><th>Date</th></tr></thead><tbody>${ev}</tbody></table></div>` : ""}`;
+}
+
+async function ensureSearch() { if (!searchIdx) { $("q").placeholder = "Loading the address index…"; searchIdx = await getJSON("search.json"); $("q").placeholder = "2113 Wilkens Ave or 0702 050"; } }
+function runSearch() {
+  const q = $("q").value.trim().toUpperCase(); const box = $("results");
+  if (!q || !searchIdx) { box.hidden = true; return; }
+  const nk = normKey(q), out = [];
+  const isKey = /^\d{3,4}/.test(nk) || nk.startsWith("PSC");
+  for (const row of searchIdx) {
+    if ((isKey && row[0].startsWith(nk.length >= 7 ? nk : nk)) || (!isKey && row[1] && row[1].includes(q))) { out.push(row); if (out.length >= 8) break; }
+  }
+  if (!out.length && isKey && nk.length === 6) { /* block given with 2-digit lot etc. */ }
+  box.innerHTML = out.length ? out.map(r => `<li><button type="button" data-k="${r[0]}" data-ll="${r[5]},${r[4]}"><span class="mono">${fmtKey(r[0])}</span><span>${esc(r[1] || "No address")}</span></button></li>`).join("")
+    : `<li><span class="small" style="display:block;padding:8px 10px">No parcel matches. Try the street number and name, or a block-lot like 0702 050.</span></li>`;
+  box.hidden = false;
+  box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    const [lat, lng] = b.dataset.ll.split(",").map(Number); box.hidden = true; $("q").value = b.textContent.trim();
+    map.setView([lat, lng], 18); select(b.dataset.k, [lat, lng]); }));
+}
+
+(async function init() {
+  meta = await getJSON("meta.json");
+  meta.sources.forEach(s => srcById[s.source_id] = s);
+  $("built").textContent = meta.built;
+  $("confn").textContent = `${meta.n_conflict.toLocaleString()} of ${meta.n_parcels.toLocaleString()} parcels have records that disagree. Turned on, these show with a purple outline, including grey parcels.`;
+  $("rules").querySelector("tbody").innerHTML = meta.rules.map(r => `<tr><td class="mono">${r.rule_id}</td><td>${LAB[CATS.indexOf(r.category)]}<br><span class="small">${r.certainty}</span></td><td>${esc(r.condition)}</td></tr>`).join("");
+  $("sources").querySelector("tbody").innerHTML = meta.sources.map(s => `<tr><td><a href="${esc(s.service_url)}" target="_blank" rel="noopener">${esc(s.name || s.source_id)}</a><br><span class="small">${esc(s.role || "")}</span></td><td class="n">${(+s.n_records).toLocaleString()}</td><td class="small">${esc((s.layer_last_edit || "").slice(0, 10) || "not stated")}</td></tr>`).join("");
+  renderChips();
+  const b = meta.bounds;
+  ctx = await getJSON("context.json");
+  const md = L.latLngBounds(ctx.md_bounds);
+  cityBounds = L.latLngBounds(b);
+  map = L.map("map", { zoomControl: false, attributionControl: false, preferCanvas: true, maxZoom: 20,
+    maxBounds: md.pad(0.08), maxBoundsViscosity: 1.0, inertia: false, zoomSnap: 0.25 });
+  map.setMinZoom(Math.max(6, Math.floor(map.getBoundsZoom(md, false) * 4) / 4));
+  L.control.zoom({ position: "topright" }).addTo(map);
+  const Home = L.Control.extend({ options: { position: "topright" }, onAdd() {
+    const el = L.DomUtil.create("button", "home"); el.type = "button"; el.textContent = "City overview";
+    L.DomEvent.disableClickPropagation(el); el.addEventListener("click", resetView); return el; } });
+  new Home().addTo(map);
+  map.fitBounds(cityBounds);
+  map.createPane("context").style.zIndex = 150;
+  const ctxRenderer = L.canvas({ pane: "context", padding: 0.5 });
+  const toLL = g => g.map(poly => poly.map(ring => ring.map(([x, y]) => [y, x])));
+  ctx.states.forEach(s => ctxLayers.push([L.polygon(toLL(s.g), { renderer: ctxRenderer, interactive: false }).addTo(map), "state"]));
+  ctx.counties.forEach(s => ctxLayers.push([L.polygon(toLL(s.g), { renderer: ctxRenderer, interactive: false }).addTo(map), "county"]));
+  drawContextStyle();
+  renderer = L.canvas({ padding: 0.4, tolerance: 2 });
+  map.createPane("cityline").style.zIndex = 450; map.getPane("cityline").style.pointerEvents = "none";
+  const cityRenderer = L.canvas({ pane: "cityline", padding: 0.4 });
+  ctx.city.forEach(s => ctxLayers.push([L.polygon(toLL(s.g), { renderer: cityRenderer, interactive: false }), "city"]));
+  drawContextStyle(); ctxLayers.filter(l => l[1] === "city").forEach(([l]) => l.addTo(map));
+  DEFAULT_DETAIL = $("detail").innerHTML;
+  $("detail").addEventListener("click", e => { if (e.target.closest("#back")) resetView(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && selected && document.activeElement !== $("q")) resetView(); });
+  meta.tiles.forEach(t => L.imageOverlay(t.f, t.b, { interactive: false }).addTo(map));
+  renderLegend();
+  const feats = await getJSON("parcels.json");
+  for (const f of feats) {
+    const ll = f.g.map(poly => poly.map(ring => ring.map(([x, y]) => [y, x])));
+    const gk = gkey(f.c, f.r, f.x);
+    const g = groups[gk] || (groups[gk] = L.featureGroup());
+    const p = L.polygon(ll, styleFor(f.c, f.r, f.x)); p.on("click", e => { L.DomEvent.stopPropagation(e); select(f.k, e.latlng); });
+    p.addTo(g); byKey[f.k] = p; maskByKey[f.k] = f.m || 0;
+    const mode = f.c === 0 ? "B" : f.c === 1 ? "L" : null;
+    if (mode) {
+      const s = Math.min(4, Math.max(1, score(f.m || 0, mode)));
+      evCounts[mode][s] = (evCounts[mode][s] || 0) + 1;
+      const eg = evGroups[mode][s] || (evGroups[mode][s] = L.featureGroup());
+      const q = L.polygon(ll, evStyle(s)); q.on("click", e => { L.DomEvent.stopPropagation(e); select(f.k, e.latlng); }); q.addTo(eg);
+    }
+  }
+  applyFilters();
+  $("status").hidden = true;
+  const h = location.hash.match(/^#p-([A-Z0-9]+)$/); if (h) { const p = byKey[h[1]]; if (p) map.fitBounds(p.getBounds(), { maxZoom: 18 }); select(h[1]); }
+  // click anywhere: pick the parcel whose interior point is nearest (within 60 m) — covers grey parcels and the canopy/stormwater views
+  map.on("click", async e => {
+    await ensureSearch(); const { lat, lng } = e.latlng, kx = Math.cos(lat * Math.PI / 180);
+    let best = null, bd = Infinity;
+    for (const r of searchIdx) { const dy = r[5] - lat, dx = (r[4] - lng) * kx, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = r; } }
+    if (best && Math.sqrt(bd) * 111000 < 60) select(best[0], [best[5], best[4]]);
+  });
+  $("q").addEventListener("focus", () => ensureSearch().then(runSearch));
+  $("q").addEventListener("input", () => ensureSearch().then(runSearch));
+  $("q").addEventListener("keydown", e => { if (e.key === "Escape") $("results").hidden = true; });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { restyle(); renderLegend(); });
+  new MutationObserver(() => { restyle(); renderLegend(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})().catch(err => { $("status").textContent = "The map data did not load. Reload the page to try again."; console.error(err); });
+</script>
+</body>
+</html>

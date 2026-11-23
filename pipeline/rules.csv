@@ -1,0 +1,17 @@
+rule_id,category,certainty,condition,precedence
+R01,PARK,high,RESPAGCY=18 (Rec & Parks) AND on Rec & Parks parcel inventory,1
+R02,PARK,medium,RESPAGCY=18 OR on Rec & Parks inventory (not both),2
+R03,PROTECTED_GREENSPACE,high,Owned by Baltimore Green Space AND inside a BGS preserved/forest site,3
+R04,PROTECTED_GREENSPACE,medium,Owned by Baltimore Green Space OR >=50% inside a BGS preserved/forest site polygon (or forest site point),4
+R05,VACANT_LOT,medium,"Open vacant building notice, but a demolition was completed on/after the notice date",5
+R06,VACANT_BUILDING,high,Open VBN AND assessor VACIND=Y AND assessor shows improvements AND no rehab permit after the notice,6
+R07,VACANT_BUILDING,medium,"Open VBN, other combinations (see conflict_note)",7
+R08,TRANSPORTATION,high,"Owner is city transportation (RESPAGCY 11 Highways, 31 Excess Street Opening, 37 Transit & Traffic), a named state transportation agency, or a railroad",8
+R09,TRANSPORTATION,low,Owner 'State of Maryland' with no agency named; EXMPCODE 30/36/38 matches the codes used by named transportation agencies (inferred),9
+R10,VACANT_BUILDING,low,"Assessor VACIND=Y with improvements, but no open VBN",10
+R11,COMMUNITY_OPEN_SPACE,medium,Baltimore Green Space community-managed site (2023 list) or UMBC urban-agriculture site; NOT legally protected,11
+R12,VACANT_LOT,high,"Assessor NO_IMPRV=Y AND on a city vacant-lot list (Vacant_Lots, MCC or Private vacant lots)",12
+R13,VACANT_LOT,medium,"On a vacant-lot list but assessor shows improvements, OR unimproved with a completed demolition",13
+R14,VACANT_LOT,low,"Assessor NO_IMPRV=Y only (may be a yard, parking or side lot)",14
+R15,NOT_VACANT,medium,"NO_IMPRV not Y AND (CURRIMPR>0 or STRUCTAREA>0), and no vacancy evidence from any source",15
+R16,NOT_VACANT,low,NO_IMPRV not Y but no improvement value or structure area recorded; no vacancy evidence,16

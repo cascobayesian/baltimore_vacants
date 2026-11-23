@@ -1,0 +1,13 @@
+check,value
+no_key,0
+bad_key_shape,0
+empty_geom,0
+invalid_geom,4
+multirow_keys,270
+multirow_rows,697
+multirow_keys_attr_disagree,0
+slivers_lt5m2,95
+stacked_groups,405
+stacked_rows,14895
+stacked_groups_sharing_PINRELATE,293
+footprints_outside_city,0
