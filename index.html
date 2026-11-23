@@ -45,6 +45,14 @@ body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-s
 .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1.5px solid var(--panel); box-shadow: 0 0 0 1px var(--line); }
 .metrics { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; font-size: 13px; }
 .metrics dt { color: var(--muted); } .metrics dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.layerbar { position: absolute; z-index: 1000; top: 10px; left: max(10px, env(safe-area-inset-left, 0px)); right: 150px; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.lb-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; pointer-events: auto; align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.lb { font: inherit; font-size: 12.5px; font-weight: 600; padding: 6px 10px; border-radius: 5px; border: 0; background: transparent; color: var(--fg); cursor: pointer; white-space: nowrap; }
+.lb:hover { background: var(--bg); }
+.lb[aria-pressed="true"] { background: var(--fg); color: var(--panel); }
+.lb.ov[aria-pressed="true"] { background: #2f7fbf; color: #fff; }
+.lb-lab { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 0 6px; }
+@media (max-width: 760px) { .layerbar { right: 52px; } .lb-row { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; } }
 .home { font: inherit; font-size: 12.5px; font-weight: 600; padding: 7px 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
 h1 { font-size: 19px; line-height: 1.25; margin: 0; text-wrap: balance; font-weight: 700; }
 .sub { color: var(--muted); margin: 4px 0 0; line-height: 1.45; }
@@ -133,12 +141,13 @@ details summary { cursor: pointer; font-weight: 600; }
       <h1>Baltimore parcel vacancy map</h1>
       <p class="sub">Every city parcel, labelled from public records, with a certainty and the receipts behind each label. Built <span id="built">2026-11-23</span>.</p>
     </header>
-    <div class="modes" role="group" aria-label="Map layer">
-      <button type="button" data-mode="all" aria-pressed="true">All land</button>
-      <button type="button" data-mode="B" aria-pressed="false">Vacant buildings</button>
-      <button type="button" data-mode="L" aria-pressed="false">Vacant lots</button>
-      <button type="button" data-mode="canopy" aria-pressed="false">Tree canopy</button>
-      <button type="button" data-mode="storm" aria-pressed="false">Stormwater</button>
+    <div class="modes" role="group" aria-label="Map view">
+      <button type="button" data-base="all" aria-pressed="true">All land</button>
+      <button type="button" data-base="B" aria-pressed="false">Vacant buildings</button>
+      <button type="button" data-base="L" aria-pressed="false">Vacant lots</button>
+      <button type="button" data-base="canopy" aria-pressed="false">Tree canopy</button>
+      <button type="button" data-base="canopy_change" aria-pressed="false">Canopy change</button>
+      <button type="button" data-base="imperv" aria-pressed="false">Paved &amp; roofed</button>
     </div>
     <div class="search">
       <label for="q" class="small">Find a parcel by address or block-lot</label>
@@ -151,16 +160,15 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="legend" id="legend"></div>
       <p class="small" id="legendnote" hidden></p>
     </section>
-    <section id="envsec" class="envsec" hidden>
-      <div class="chips" id="canopyview"><button type="button" class="chip" data-v="canopy" aria-pressed="true">Canopy 2021</button><button type="button" class="chip" data-v="canopy_change" aria-pressed="false">Change since 2013</button></div>
-      <div class="chips" id="stormtoggles">
-        <button type="button" class="chip" data-t="imperv" aria-pressed="true">Paved and roofed share</button>
-        <button type="button" class="chip" data-t="pipes" aria-pressed="true">Storm pipes</button>
-        <button type="button" class="chip" data-t="inlets" aria-pressed="true">Inlets</button>
-        <button type="button" class="chip" data-t="outfalls" aria-pressed="false">Outfalls</button>
-        <button type="button" class="chip" data-t="projects" aria-pressed="true">Restoration projects</button>
+    <section id="envsec" class="envsec">
+      <h2>Stormwater features</h2>
+      <div class="chips" role="group" aria-label="Stormwater features">
+        <button type="button" class="chip" data-ov="pipes" aria-pressed="false">Storm pipes</button>
+        <button type="button" class="chip" data-ov="inlets" aria-pressed="false">Inlets</button>
+        <button type="button" class="chip" data-ov="outfalls" aria-pressed="false">Outfalls</button>
+        <button type="button" class="chip" data-ov="projects" aria-pressed="false">Restoration projects</button>
       </div>
-      <p class="small" id="envnote"></p>
+      <p class="small">These sit on top of any view. Inlets appear when you zoom in close.</p>
     </section>
     <section id="certsec">
       <h2>Certainty</h2>
@@ -182,7 +190,19 @@ details summary { cursor: pointer; font-weight: 600; }
     </details>
     <p class="small foot">Records come from the City of Baltimore (Open Baltimore, DHCD), Baltimore Green Space, UMBC and BNIA. This index is not an official determination of vacancy.</p>
   </aside>
-  <div class="mapwrap"><div id="map" role="region" aria-label="Map of Baltimore parcels"></div><div class="status" id="status">Loading parcels…</div></div>
+  <div class="mapwrap"><div id="map" role="region" aria-label="Map of Baltimore parcels"></div><div class="status" id="status">Loading parcels…</div>
+    <div class="layerbar" id="layerbar">
+      <div class="lb-row" role="group" aria-label="Map view"><button type="button" class="lb" data-base="all" aria-pressed="true">All land</button>
+      <button type="button" class="lb" data-base="B" aria-pressed="false">Vacant buildings</button>
+      <button type="button" class="lb" data-base="L" aria-pressed="false">Vacant lots</button>
+      <button type="button" class="lb" data-base="canopy" aria-pressed="false">Tree canopy</button>
+      <button type="button" class="lb" data-base="canopy_change" aria-pressed="false">Canopy change</button>
+      <button type="button" class="lb" data-base="imperv" aria-pressed="false">Paved &amp; roofed</button></div>
+      <div class="lb-row" role="group" aria-label="Stormwater features"><span class="lb-lab">Stormwater</span><button type="button" class="lb ov" data-ov="pipes" aria-pressed="false">Storm pipes</button>
+        <button type="button" class="lb ov" data-ov="inlets" aria-pressed="false">Inlets</button>
+        <button type="button" class="lb ov" data-ov="outfalls" aria-pressed="false">Outfalls</button>
+        <button type="button" class="lb ov" data-ov="projects" aria-pressed="false">Restoration projects</button></div>
+    </div></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -208,7 +228,9 @@ const fmtKey = k => { const m = KEY_RE.exec(k); return m ? m[1] + " " + m[2] : k
 let meta, srcById = {}, map, renderer, groups = {}, byKey = {}, selected = null, marker = null, searchIdx = null, chunks = {};
 const state = { cats: new Set([0,1,2,3,4,5]), certs: new Set([0,1,2]), conflictOnly: false, mode: "all", bins: new Set([1,2,3,4]) };
 let envMeta = null, envOverlays = {}, swLayers = {}, envChunks = {}, canopyView = "canopy";
-const stormOn = new Set(["imperv", "pipes", "inlets", "projects"]);
+const stormOn = new Set();   // stormwater overlays, independent of the base view
+let base = "all";
+const BASES = { all: ["all"], B: ["B"], L: ["L"], canopy: ["canopy", "canopy"], canopy_change: ["canopy", "canopy_change"], imperv: ["storm"] };
 const ENV_MODES = ["canopy", "storm"];
 const PROJ_COL = { Completed: "#1f7a4d", Planned: "#2a78d6", Potential: "#d09a1a" };
 const projColor = st => PROJ_COL[st] || "#8a8f93";
@@ -241,20 +263,32 @@ function applyFilters() {
   }
   for (const m of ["B", "L"]) for (const [s, g] of Object.entries(evGroups[m])) toggle(g, state.mode === m && state.bins.has(+s));
   $("certsec").hidden = $("confsec").hidden = state.mode !== "all";
-  $("envsec").hidden = !ENV_MODES.includes(state.mode);
-  $("canopyview").hidden = state.mode !== "canopy"; $("stormtoggles").hidden = state.mode !== "storm";
   if (envMeta) {
     const want = new Set();
     if (state.mode === "canopy") want.add(canopyView);
-    if (state.mode === "storm") { if (stormOn.has("imperv")) want.add("imperv"); if (stormOn.has("pipes")) want.add("pipes"); }
+    if (state.mode === "storm") want.add("imperv");
+    if (stormOn.has("pipes")) want.add("pipes");
     for (const name of ["canopy", "canopy_change", "imperv", "pipes"]) {
       if (want.has(name) && !envOverlays[name]) envOverlays[name] = L.layerGroup(meta.tiles.map(t =>
         L.imageOverlay(t.f.replace("base_", name === "pipes" ? "pipes_" : "env_" + name + "_"), t.b, { interactive: false, className: "envimg" })));
       if (envOverlays[name]) toggle(envOverlays[name], want.has(name));
     }
-    for (const name of ["inlets", "outfalls", "projects"]) if (swLayers[name]) toggle(swLayers[name], state.mode === "storm" && stormOn.has(name) && (name !== "inlets" || map.getZoom() >= 16));
+    for (const name of ["inlets", "outfalls", "projects"]) if (swLayers[name]) toggle(swLayers[name], stormOn.has(name) && (name !== "inlets" || map.getZoom() >= 16));
   }
-  renderLegend();
+  renderLegend(); overlayLegend(); syncButtons();
+}
+function syncButtons() {
+  document.querySelectorAll("[data-base]").forEach(b => b.setAttribute("aria-pressed", b.dataset.base === base));
+  document.querySelectorAll("[data-ov]").forEach(b => b.setAttribute("aria-pressed", stormOn.has(b.dataset.ov)));
+}
+function overlayLegend() {
+  if (!stormOn.size || !envMeta) return;
+  const z = map.getZoom() >= 16, rows = [];
+  if (stormOn.has("pipes")) rows.push(`<div class="lrow"><span class="sw" style="background:#2f7fbf;height:3px"></span><span>Storm pipe (active)</span><span></span></div>`);
+  if (stormOn.has("inlets")) rows.push(`<div class="lrow"><span class="dot" style="background:#5b6770"></span><span>Inlet, city${z ? "" : " (zoom in to see)"}</span><span class="n">amber = private</span></div>`);
+  if (stormOn.has("outfalls")) rows.push(`<div class="lrow"><span class="dot" style="background:#7a4fb0"></span><span>Outfall</span><span></span></div>`);
+  if (stormOn.has("projects")) rows.push(...Object.entries(PROJ_COL).concat([["Rejected or infeasible", "#8a8f93"]]).map(([k, c]) => `<div class="lrow"><span class="dot" style="background:${c}"></span><span>Restoration project: ${k.toLowerCase()}</span><span class="n">${(k === "Rejected or infeasible" ? Object.entries(envMeta.status_counts).filter(([st]) => !PROJ_COL[st]).reduce((a, [, v]) => a + v, 0) : envMeta.status_counts[k] || 0).toLocaleString()}</span></div>`));
+  $("legend").insertAdjacentHTML("beforeend", `<div class="small" style="margin-top:6px">Stormwater features</div>` + rows.join(""));
 }
 function toggle(g, show) { if (show && !map.hasLayer(g)) g.addTo(map); else if (!show && map.hasLayer(g)) map.removeLayer(g); }
 function evStyle(s) { return { renderer, stroke: false, fillColor: css("--s" + s), fillOpacity: 0.92 }; }
@@ -301,14 +335,11 @@ function renderEnvLegend() {
   const name = state.mode === "canopy" ? canopyView : "imperv", L0 = envMeta.layers[name], n = envMeta.counts[name];
   $("legendh").textContent = { canopy: "Tree canopy, share of parcel (2021/22)", canopy_change: "Canopy change, 2013/14 to 2021/22 (percentage points)", imperv: "Paved and roofed share of parcel (2021/22)" }[name];
   let rows = L0.lab.map((lab, i) => `<div class="lrow"><span class="sw" style="background:${L0.col[i]}"></span><span>${esc(lab)}</span><span class="n">${(n[i] || 0).toLocaleString()}</span></div>`).join("");
-  if (state.mode === "storm") rows += `<div class="lrow"><span class="sw" style="background:#2f7fbf;height:3px"></span><span>Storm pipe (active)</span><span></span></div>
-    <div class="lrow"><span class="dot" style="background:#5b6770"></span><span>Inlet (zoom in to see)</span><span></span></div>
-    <div class="lrow"><span class="dot" style="background:#7a4fb0"></span><span>Outfall</span><span></span></div>` +
-    Object.entries(PROJ_COL).concat([["Rejected or infeasible", "#8a8f93"]]).map(([k, c]) => `<div class="lrow"><span class="dot" style="background:${c}"></span><span>Restoration project: ${k.toLowerCase()}</span><span class="n">${(k === "Rejected or infeasible" ? Object.entries(envMeta.status_counts).filter(([s]) => !PROJ_COL[s]).reduce((a, [, v]) => a + v, 0) : envMeta.status_counts[k] || 0).toLocaleString()}</span></div>`).join("");
+
   $("legend").innerHTML = rows;
   $("legendnote").textContent = state.mode === "canopy"
     ? "Measured from 1-metre land-cover maps made from aerial imagery (Chesapeake Bay Program land use/land cover, 2024 edition). Counts are parcel footprints."
-    : "Paved and roofed share comes from the same 1-metre land cover. Pipes, inlets and outfalls are the city's storm drain records (DPW). Projects are DPW's stormwater restoration planning sites.";
+    : "Paved and roofed share comes from the same 1-metre land cover. Add storm pipes, inlets, outfalls and DPW restoration projects with the Stormwater buttons.";
 }
 async function ensureEnv() {
   if (envMeta) return;
@@ -319,20 +350,25 @@ async function ensureEnv() {
   swLayers.outfalls = L.layerGroup(sw.outfalls.map(([ll, oid, type, ws]) => L.circleMarker(ll, { renderer, bubblingMouseEvents: false, radius: 4, weight: 1, color: css("--panel"), fillColor: "#7a4fb0", fillOpacity: 1 })
     .bindPopup(`<strong>Outfall ${esc(oid)}</strong><br>${esc(type)}; ${esc(ws)}`)));
   swLayers.inlets = L.layerGroup(sw.inlets.map(([la, lo, ag]) => L.circleMarker([la, lo], { renderer, radius: 2.5, weight: 0, fillColor: ag === 2 ? "#b8730f" : "#5b6770", fillOpacity: 0.9, interactive: false })));
-  map.on("zoomend", () => { if (state.mode === "storm") applyFilters(); });
+  map.on("zoomend", () => { if (stormOn.has("inlets")) applyFilters(); });
   const extra = envMeta.sources.filter(s => !s.source_id.startsWith("PARCEL"));
   $("sources").querySelector("tbody").insertAdjacentHTML("beforeend", extra.map(s => `<tr><td><a href="${esc(s.portal_url || s.service_url)}" target="_blank" rel="noopener">${esc(s.name || s.source_id)}</a><br><span class="small">${esc(s.role || "")}</span></td><td class="n">${s.n_records ? (+s.n_records).toLocaleString() : "raster"}</td><td class="small">downloaded ${esc((s.downloaded_at || "").slice(0, 10))}</td></tr>`).join(""));
 }
-function setMode(m) {
-  if (ENV_MODES.includes(m) && !envMeta) ensureEnv().then(() => { if (state.mode === m) applyFilters(); }).catch(() => { $("legendnote").textContent = "The canopy and stormwater data did not load. Reload the page to try again."; });
-  state.mode = m; document.querySelectorAll(".modes button").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === m)); applyFilters();
+function setBase(b) {
+  base = b; const [m, v] = BASES[b]; state.mode = m; if (v) canopyView = v;
+  if (ENV_MODES.includes(m) && !envMeta) ensureEnv().then(applyFilters).catch(envFail);
+  applyFilters();
 }
+function toggleOverlay(t) {
+  stormOn.has(t) ? stormOn.delete(t) : stormOn.add(t);
+  if (!envMeta) ensureEnv().then(applyFilters).catch(envFail);
+  applyFilters();
+}
+function envFail() { $("legendnote").hidden = false; $("legendnote").textContent = "The canopy and stormwater data did not load. Reload the page to try again."; }
 function renderChips() {
-  document.querySelectorAll(".modes button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.mode)));
-  $("canopyview").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-    canopyView = b.dataset.v; $("canopyview").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); applyFilters(); }));
-  $("stormtoggles").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-    const t = b.dataset.t; stormOn.has(t) ? stormOn.delete(t) : stormOn.add(t); b.setAttribute("aria-pressed", stormOn.has(t)); applyFilters(); }));
+  document.querySelectorAll("[data-base]").forEach(b => b.addEventListener("click", () => setBase(b.dataset.base)));
+  document.querySelectorAll("[data-ov]").forEach(b => b.addEventListener("click", () => toggleOverlay(b.dataset.ov)));
+  L.DomEvent.disableClickPropagation($("layerbar")); L.DomEvent.disableScrollPropagation($("layerbar"));
   $("certs").innerHTML = CERT.map((c, i) => `<button type="button" class="chip" data-r="${i}" aria-pressed="${state.certs.has(i)}">${c[0].toUpperCase() + c.slice(1)}</button>`).join("");
   $("certs").querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
     const i = +b.dataset.r; state.certs.has(i) ? state.certs.delete(i) : state.certs.add(i); b.setAttribute("aria-pressed", state.certs.has(i)); applyFilters(); }));
