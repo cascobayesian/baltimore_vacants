@@ -1,0 +1,138 @@
+Parcels: 237088 
+
+Vacancy evidence tier x type
+Key: <tier_label>
+                                     tier_label     V1 vacant_building
+                                         <char>  <int>           <int>
+1: confirmed: 3 of 3 builds, all high certainty      0           11012
+2:                     contested: 2 of 3 builds      0              21
+3:                not vacant (all three builds) 203045               0
+4:                        strong: 3 of 3 builds      0             291
+5:                          weak: 1 of 3 builds      0               0
+   vacant_lot
+        <int>
+1:       9631
+2:       2106
+3:          0
+4:       9283
+5:       1699
+
+Agreement on the land category:
+    agree      N
+   <char>  <int>
+1:    3/3 230763
+2:    2/3   5970
+3:   none    355
+
+Consensus category (majority of 3):
+     consensus_category      N
+                 <char>  <int>
+1:           not_vacant 199932
+2:           vacant_lot  21020
+3:      vacant_building  11324
+4:         other_public   2076
+5:                 park   1069
+6:       transportation    969
+7:             disputed    355
+8: community_open_space    290
+9:      protected_green     53
+
+Dispute reasons:
+                                                             dispute_reason
+                                                                     <char>
+ 1:                                      land-use definitions: other_public
+ 2:           vacant-lot list or demolition record vs assessed improvements
+ 3:                   vacant vs community_open_space (land-use definitions)
+ 4:                           vacant vs other_public (land-use definitions)
+ 5:            assessor shows no improvements but imagery shows a structure
+ 6:                                   vacant vs park (land-use definitions)
+ 7:   vacant vs protected_green+community_open_space (land-use definitions)
+ 8:                        vacant vs protected_green (land-use definitions)
+ 9:                                                  other rule differences
+10:                                   land-use definitions: protected_green
+11:                              land-use definitions: park+protected_green
+12:                       land-use definitions: transportation+other_public
+13:              land-use definitions: protected_green+community_open_space
+14:                         vacant vs transportation (land-use definitions)
+15:                                    land-use definitions: transportation
+16:                                              land-use definitions: park
+17:                              land-use definitions: community_open_space
+18:                    land-use definitions: protected_green+transportation
+19:                         land-use definitions: park+community_open_space
+20:                               land-use definitions: park+transportation
+21:                      land-use definitions: protected_green+other_public
+22:                 land-use definitions: community_open_space+other_public
+23: land-use definitions: protected_green+community_open_space+other_public
+24:         vacant vs protected_green+transportation (land-use definitions)
+                                                             dispute_reason
+                                                                     <char>
+        N
+    <int>
+ 1:  2123
+ 2:  1703
+ 3:   726
+ 4:   469
+ 5:   289
+ 6:   269
+ 7:   141
+ 8:   121
+ 9:    77
+10:    66
+11:    50
+12:    50
+13:    47
+14:    42
+15:    36
+16:    27
+17:    23
+18:    20
+19:    14
+20:    13
+21:    11
+22:     6
+23:     1
+24:     1
+        N
+    <int>
+
+Dispute reasons, parcels with 1 or 2 vacancy votes:
+    votes                                                        dispute_reason
+    <int>                                                                <char>
+ 1:     1         vacant-lot list or demolition record vs assessed improvements
+ 2:     1                         vacant vs other_public (land-use definitions)
+ 3:     1                                 vacant vs park (land-use definitions)
+ 4:     1                 vacant vs community_open_space (land-use definitions)
+ 5:     1 vacant vs protected_green+community_open_space (land-use definitions)
+ 6:     1          assessor shows no improvements but imagery shows a structure
+ 7:     1                       vacant vs transportation (land-use definitions)
+ 8:     1                                                other rule differences
+ 9:     1                      vacant vs protected_green (land-use definitions)
+10:     1       vacant vs protected_green+transportation (land-use definitions)
+11:     2         vacant-lot list or demolition record vs assessed improvements
+12:     2                 vacant vs community_open_space (land-use definitions)
+13:     2          assessor shows no improvements but imagery shows a structure
+14:     2                         vacant vs other_public (land-use definitions)
+15:     2                      vacant vs protected_green (land-use definitions)
+16:     2                                                other rule differences
+17:     2                       vacant vs transportation (land-use definitions)
+18:     2                                 vacant vs park (land-use definitions)
+        N
+    <int>
+ 1:   659
+ 2:   282
+ 3:   267
+ 4:   249
+ 5:   141
+ 6:    55
+ 7:    24
+ 8:    20
+ 9:     1
+10:     1
+11:  1044
+12:   477
+13:   230
+14:   187
+15:   120
+16:    49
+17:    18
+18:     2

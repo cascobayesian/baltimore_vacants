@@ -145,6 +145,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <button type="button" data-base="all" aria-pressed="true">All land</button>
       <button type="button" data-base="B" aria-pressed="false">Vacant buildings</button>
       <button type="button" data-base="L" aria-pressed="false">Vacant lots</button>
+      <button type="button" data-base="C" aria-pressed="false">Agreement of 3 builds</button>
       <button type="button" data-base="canopy" aria-pressed="false">Tree canopy</button>
       <button type="button" data-base="canopy_change" aria-pressed="false">Canopy change</button>
       <button type="button" data-base="imperv" aria-pressed="false">Paved &amp; roofed</button>
@@ -195,6 +196,7 @@ details summary { cursor: pointer; font-weight: 600; }
       <div class="lb-row" role="group" aria-label="Map view"><button type="button" class="lb" data-base="all" aria-pressed="true">All land</button>
       <button type="button" class="lb" data-base="B" aria-pressed="false">Vacant buildings</button>
       <button type="button" class="lb" data-base="L" aria-pressed="false">Vacant lots</button>
+      <button type="button" class="lb" data-base="C" aria-pressed="false">Agreement of 3 builds</button>
       <button type="button" class="lb" data-base="canopy" aria-pressed="false">Tree canopy</button>
       <button type="button" class="lb" data-base="canopy_change" aria-pressed="false">Canopy change</button>
       <button type="button" class="lb" data-base="imperv" aria-pressed="false">Paved &amp; roofed</button></div>
@@ -226,14 +228,15 @@ const normKey = s => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
 const fmtKey = k => { const m = KEY_RE.exec(k); return m ? m[1] + " " + m[2] : k; };
 
 let meta, srcById = {}, map, renderer, groups = {}, byKey = {}, selected = null, marker = null, searchIdx = null, chunks = {};
-const state = { cats: new Set([0,1,2,3,4,5]), certs: new Set([0,1,2]), conflictOnly: false, mode: "all", bins: new Set([1,2,3,4]) };
+const state = { cats: new Set([0,1,2,3,4,5]), certs: new Set([0,1,2]), conflictOnly: false, mode: "all", bins: new Set([1,2,3,4]), tiers: new Set([1,2,3,4]) };
 let envMeta = null, envOverlays = {}, swLayers = {}, envChunks = {}, canopyView = "canopy";
 const stormOn = new Set();   // stormwater overlays, independent of the base view
 let base = "all";
-const BASES = { all: ["all"], B: ["B"], L: ["L"], canopy: ["canopy", "canopy"], canopy_change: ["canopy", "canopy_change"], imperv: ["storm"] };
+const BASES = { all: ["all"], B: ["B"], L: ["L"], canopy: ["canopy", "canopy"], canopy_change: ["canopy", "canopy_change"], imperv: ["storm"], C: ["C"] };
 const ENV_MODES = ["canopy", "storm"];
 const PROJ_COL = { Completed: "#1f7a4d", Planned: "#2a78d6", Potential: "#d09a1a" };
 const projColor = st => PROJ_COL[st] || "#8a8f93";
+const consGroups = {}, consCounts = {}; let consMeta = null, consLook = null, consLoading = null;
 const evGroups = { B: {}, L: {} }, evCounts = { B: {}, L: {} }, maskByKey = {};
 let ctx = null, ctxLayers = [], cityBounds = null, DEFAULT_DETAIL = "";
 function drawContextStyle() {
@@ -262,6 +265,7 @@ function applyFilters() {
     toggle(g, show);
   }
   for (const m of ["B", "L"]) for (const [s, g] of Object.entries(evGroups[m])) toggle(g, state.mode === m && state.bins.has(+s));
+  for (const [t, g] of Object.entries(consGroups)) toggle(g, state.mode === "C" && state.tiers.has(+t));
   $("certsec").hidden = $("confsec").hidden = state.mode !== "all";
   if (envMeta) {
     const want = new Set();
@@ -295,6 +299,7 @@ function evStyle(s) { return { renderer, stroke: false, fillColor: css("--s" + s
 function restyle() {
   for (const [k, g] of Object.entries(groups)) { const [c, r, x] = k.split("-").map(Number); g.setStyle(styleFor(c, r, x)); }
   for (const m of ["B", "L"]) for (const [s, g] of Object.entries(evGroups[m])) g.setStyle(evStyle(+s));
+  for (const [t, g] of Object.entries(consGroups)) g.setStyle(evStyle(+t));
   drawContextStyle();
 }
 // Bureaucratic vacancy signals, one bit each (order set in scripts/41_export_web_extras.R)
@@ -305,8 +310,52 @@ const MODE_BITS = { B: [0, 1, 2, 3, 4], L: [5, 6, 7, 8, 9] };
 const score = (m, mode) => MODE_BITS[mode].reduce((a, b) => a + ((m >> b) & 1), 0);
 const BIN_LAB = ["", "1 record", "2 records", "3 records", "4 or more records"];
 
+// ---- Agreement of three independent builds (scripts/70_consensus.R)
+const TIER_SHORT = ["", "Weak: 1 of 3 builds call it vacant", "Contested: 2 of 3 builds", "Strong: all 3 builds", "Confirmed: all 3 builds, each at high certainty"];
+const CC_LAB = ["Vacant building", "Vacant lot", "Community-managed open space", "Rec & Parks land", "Protected green space", "Transportation land", "Other public land", "No vacancy evidence"];
+async function ensureCons(withShapes) {
+  if (!consMeta) consMeta = await getJSON("consensus_meta.json");
+  if (!consLook) consLook = await getJSON("consensus.json");
+  if (!withShapes || Object.keys(consGroups).length) return;
+  if (!consLoading) consLoading = getJSON("consensus_parcels.json").then(feats => {
+    for (const f of feats) {
+      const ll = f.g.map(poly => poly.map(ring => ring.map(([x, y]) => [y, x])));
+      const g = consGroups[f.t] || (consGroups[f.t] = L.featureGroup());
+      consCounts[f.t] = (consCounts[f.t] || 0) + 1;
+      const q = L.polygon(ll, evStyle(f.t)); q.on("click", e => { L.DomEvent.stopPropagation(e); select(f.k, e.latlng); }); q.addTo(g);
+      if (!byKey[f.k]) byKey[f.k] = q;
+    } });
+  await consLoading;
+}
+function renderConsLegend() {
+  $("legendh").textContent = "Vacancy: agreement of three independent builds";
+  if (!consMeta) { $("legend").innerHTML = ""; $("legendnote").hidden = false; $("legendnote").textContent = "Loading…"; return; }
+  const tot = t => consMeta.counts.filter(d => d.tier === t).reduce((a, d) => a + d.N, 0);
+  $("legend").innerHTML = [4, 3, 2, 1].map(t => `<label class="lrow${state.tiers.has(t) ? "" : " off"}"><input type="checkbox" data-t="${t}" ${state.tiers.has(t) ? "checked" : ""}>
+    <span class="sw" style="background:${css("--s" + t)}"></span><span>${TIER_SHORT[t]}</span><span class="n">${tot(t).toLocaleString()}</span></label>`).join("");
+  $("legend").querySelectorAll("input").forEach(el => el.addEventListener("change", () => {
+    const t = +el.dataset.t; el.checked ? state.tiers.add(t) : state.tiers.delete(t); applyFilters(); }));
+  $("legendnote").hidden = false;
+  $("legendnote").innerHTML = `The vacancy index was built three times from the same request: once on 23 November and twice more, independently and from fresh downloads, on 24 November. Darker parcels are ones that more builds call vacant (building or lot). Where builds disagree, the parcel card says why. ${consMeta.n_agree3.toLocaleString()} of ${consMeta.n_parcels.toLocaleString()} parcels get the same label from all three.`;
+}
+async function fillCons(k) {
+  const box = () => $("conscard"); if (!box()) return;
+  try { await ensureCons(false); } catch (e) { box().innerHTML = `<p class="small">The comparison of the three builds did not load.</p>`; return; }
+  if (selected !== k || !box()) return;
+  const c = consLook[k];
+  if (!c) { box().innerHTML = `<h2>Three independent builds</h2><p class="small">All three builds give this parcel the same label.</p>`; return; }
+  const runs = consMeta.runs.map((r, i) => { const [cat, cert, rule] = c.v[i]; return `<tr><td>${esc(r.label)}</td><td>${esc(CC_LAB[cat])}</td><td>${esc(consMeta.certs[cert] || "")}</td><td class="mono">${esc(rule || "")}</td></tr>`; }).join("");
+  box().innerHTML = `<h2>Three independent builds</h2>
+    ${c.t ? `<div class="top"><span class="badge"><span class="sw" style="background:${css("--s" + c.t)}"></span>${esc(TIER_SHORT[c.t])}</span><span class="cert">score ${c.s} of 3</span></div>` : ""}
+    <div class="tbl"><table><thead><tr><th>Build</th><th>Label</th><th>Certainty</th><th>Rule</th></tr></thead><tbody>${runs}</tbody></table></div>
+    ${c.w ? `<p class="small"><strong>Why they differ:</strong> ${esc(c.w)}.</p>` : ""}
+    ${c.cs != null && c.cs >= 10 ? `<p class="small">Canopy estimates differ by ${c.cs} points between builds.</p>` : ""}
+    <p class="small">Score: each build that calls the parcel vacant adds 1 (high certainty), 0.6 (medium) or 0.3 (low). The receipts below are from build 1.</p>`;
+}
+
 function renderLegend() {
   if (ENV_MODES.includes(state.mode)) return renderEnvLegend();
+  if (state.mode === "C") return renderConsLegend();
   if (state.mode !== "all") return renderEvLegend();
   $("legendh").textContent = "Categories"; $("legendnote").hidden = true;
   const counts = Array(7).fill(0); meta.counts.forEach(d => { const i = CATS.indexOf(d.category); if (state.certs.has(CERT.indexOf(d.certainty))) counts[i] += d.N; });
@@ -356,6 +405,7 @@ async function ensureEnv() {
 }
 function setBase(b) {
   base = b; const [m, v] = BASES[b]; state.mode = m; if (v) canopyView = v;
+  if (m === "C" && !Object.keys(consGroups).length) { $("status").hidden = false; $("status").textContent = "Loading the three-build comparison…"; ensureCons(true).then(() => { $("status").hidden = true; applyFilters(); }).catch(() => { $("status").textContent = "The comparison did not load. Reload the page to try again."; }); }
   if (ENV_MODES.includes(m) && !envMeta) ensureEnv().then(applyFilters).catch(envFail);
   applyFilters();
 }
@@ -410,12 +460,13 @@ async function select(k, latlng) {
     ${d.cd ? `<p class="small">Condominium unit. Its outline is the whole building, shared with the other units.</p>` : ""}
     <p class="small">Owner type: ${esc(d.oc.replace(/_/g, " ").toLowerCase())}</p>
     ${sigs}
+    <div id="conscard"></div>
     <div id="envcard"></div>
     <div class="links">${sdat ? `<a href="${esc(sdat)}" target="_blank" rel="noopener">SDAT assessment</a>` : ""}
       ${blk ? `<a href="https://gis.baltimorecity.gov/zoning/blockplats/${esc(blk)}.pdf" target="_blank" rel="noopener">Block plat</a>` : ""}</div>
     <div><h2>Receipts</h2><div class="tbl"><table><thead><tr><th>Source</th><th>Field</th><th>Value</th><th>Date</th><th>Matched</th></tr></thead><tbody>${rows}</tbody></table></div></div>
   </div>`;
-  fillEnv(k);
+  fillCons(k); fillEnv(k);
 }
 async function fillEnv(k) {
   const box = () => $("envcard"); if (!box()) return;
